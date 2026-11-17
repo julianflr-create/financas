@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12343B">
+<meta name="color-scheme" content="light dark">
+<title>Finanças 2026</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --papel:#EEF2F1; --folha:#FFFFFF; --tinta:#12343B; --tinta-2:#45605F; --linha:#C9D3D1;
+  --verde:#1F7A5A; --vermelho:#B3261E; --marca:#F2C94C; --marca-suave:#F7E3A1; --foco:#2E6FD8;
+  --raio-s:8px; --raio-m:14px;
+  --fonte:"Atkinson Hyperlegible Next","Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --papel:#0F2226; --folha:#163036; --tinta:#E6EFEE; --tinta-2:#A7BDBB; --linha:#2C4A4F;
+    --verde:#5CC99B; --vermelho:#FF8A80; --marca:#E0B43A; --marca-suave:#4D4220; --foco:#8DB4FF; }
+  .acao button{color:#06261A}
+  .sinal[aria-pressed="true"]{color:#3A0A06}
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--papel);color:var(--tinta);font-family:var(--fonte);font-size:16px;line-height:1.4;-webkit-text-size-adjust:100%}
+body{min-height:100dvh;display:flex;flex-direction:column;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--foco);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* Cabeçalho */
+header.top{position:sticky;top:0;z-index:5;background:var(--tinta);color:#fff;padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;display:flex;align-items:center;gap:10px}
+@media (prefers-color-scheme: dark){ header.top{background:#081619} }
+.mes{display:flex;align-items:center;gap:2px;flex:1;min-width:0}
+.mes button{background:none;border:0;color:#fff;width:40px;height:40px;border-radius:50%;font-size:22px;line-height:1;cursor:pointer}
+.mes button:disabled{opacity:.3}
+.mes strong{font-size:19px;font-weight:700;letter-spacing:.01em;min-width:96px;text-align:center}
+.mes small{display:block;font-size:12px;font-weight:400;opacity:.75;text-align:center}
+.status{border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:999px;padding:7px 12px;font-size:14px;display:flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap}
+.status i{width:9px;height:9px;border-radius:50%;background:#7FD8B0;display:inline-block}
+.status[data-s="pend"] i{background:var(--marca)}
+.status[data-s="erro"] i{background:#FF8A80}
+.status[data-s="sync"] i{animation:pulso 1s infinite alternate}
+.status[data-s="off"] i{background:#9AA9A8}
+@keyframes pulso{to{opacity:.25}}
+@media (prefers-reduced-motion: reduce){ .status[data-s="sync"] i{animation:none} }
+
+main{flex:1;padding:0 0 calc(150px + var(--safe-b))}
+section.tela{display:none}
+section.tela.ativa{display:block}
+
+/* Abas da planilha */
+.abas{display:flex;gap:6px;overflow-x:auto;padding:14px 14px 4px;scrollbar-width:none}
+.abas::-webkit-scrollbar{display:none}
+.abas button{flex:none;border:1.5px solid var(--linha);background:var(--folha);border-radius:999px;padding:9px 15px;font-weight:500;cursor:pointer}
+.abas button[aria-pressed="true"]{background:var(--tinta);border-color:var(--tinta);color:var(--papel)}
+
+/* Valor — o elemento-assinatura */
+.valor{padding:18px 18px 6px;display:flex;align-items:flex-end;gap:10px}
+.valor label{font-size:15px;color:var(--tinta-2);padding-bottom:12px}
+.valor .campo{flex:1;position:relative}
+.valor input{width:100%;border:0;background:transparent;font-size:46px;font-weight:800;letter-spacing:-.01em;padding:0 0 2px;outline:none}
+.valor input::placeholder{color:var(--linha)}
+.valor .campo::after{content:"";position:absolute;left:-4px;right:-4px;bottom:6px;height:16px;background:var(--marca);opacity:.55;z-index:-1;border-radius:3px;transform-origin:left;transition:transform .25s}
+.valor .campo:not(.cheio)::after{transform:scaleX(.18)}
+.valor .campo{z-index:0}
+.sinal{flex:none;border:1.5px solid var(--linha);background:var(--folha);border-radius:var(--raio-s);height:44px;padding:0 12px;font-weight:700;cursor:pointer;margin-bottom:8px}
+.sinal[aria-pressed="true"]{background:var(--vermelho);border-color:var(--vermelho);color:#fff}
+.parcelinfo{margin:0;padding:0 18px;color:var(--tinta-2);font-size:15px}
+.parcelinfo:empty{display:none}
+
+/* Formulário */
+.form{padding:6px 14px 0;display:grid;gap:12px}
+.f{display:grid;gap:5px}
+.f>span{font-size:14px;color:var(--tinta-2);font-weight:500}
+.f input,.f select,.f textarea{width:100%;min-height:48px;border:1.5px solid var(--linha);background:var(--folha);border-radius:var(--raio-s);padding:10px 12px}
+.f textarea{min-height:64px;resize:vertical}
+.f select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--tinta-2) 50%),linear-gradient(135deg,var(--tinta-2) 50%,transparent 50%);background-position:calc(100% - 19px) 21px,calc(100% - 13px) 21px;background-size:6px 6px;background-repeat:no-repeat;padding-right:34px}
+.linha2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.seg{display:flex;border:1.5px solid var(--linha);border-radius:var(--raio-s);overflow:hidden;background:var(--folha)}
+.seg button{flex:1;border:0;background:transparent;min-height:46px;padding:6px 4px;cursor:pointer;font-weight:500;font-size:15px}
+.seg button+button{border-left:1.5px solid var(--linha)}
+.seg button[aria-pressed="true"]{background:var(--tinta);color:var(--papel)}
+.stepper{display:flex;align-items:center;border:1.5px solid var(--linha);border-radius:var(--raio-s);background:var(--folha);min-height:48px}
+.stepper button{width:48px;height:46px;border:0;background:none;font-size:22px;cursor:pointer}
+.stepper output{flex:1;text-align:center;font-weight:700}
+.dica{font-size:13px;color:var(--tinta-2);margin:0}
+.link{background:none;border:0;padding:0;color:var(--foco);text-decoration:underline;cursor:pointer;font-size:14px;justify-self:start}
+
+/* Prévia */
+.previa{margin:16px 14px 0;border-left:4px solid var(--marca);background:var(--folha);border-radius:0 var(--raio-s) var(--raio-s) 0;padding:10px 12px;font-size:14px}
+.previa:empty{display:none}
+.previa p{margin:0 0 6px}
+.previa p:last-child{margin:0}
+.previa .ref{color:var(--tinta-2)}
+.previa .de{white-space:nowrap}
+.previa .aviso{color:var(--vermelho)}
+
+/* Barra de ação fixa */
+.acao{position:fixed;left:0;right:0;bottom:calc(64px + var(--safe-b));padding:10px 14px;background:linear-gradient(to top,var(--papel) 70%,transparent);z-index:4}
+.acao button{width:100%;min-height:54px;border:0;border-radius:var(--raio-m);background:var(--verde);color:#fff;font-size:18px;font-weight:700;cursor:pointer}
+.acao button:disabled{background:var(--linha);color:var(--tinta-2)}
+body:not([data-tela="lancar"]) .acao{display:none}
+
+nav.baixo{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--folha);border-top:1px solid var(--linha);display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:var(--safe-b)}
+nav.baixo button{border:0;background:none;height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:13px;color:var(--tinta-2);cursor:pointer;position:relative}
+nav.baixo svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav.baixo button[aria-current="page"]{color:var(--tinta);font-weight:700}
+nav.baixo button[aria-current="page"]::before{content:"";position:absolute;top:0;left:30%;right:30%;height:3px;background:var(--tinta);border-radius:0 0 3px 3px}
+.badge{position:absolute;top:8px;left:calc(50% + 6px);background:var(--marca);color:#3A2E00;border-radius:999px;font-size:11px;font-weight:800;padding:1px 6px}
+
+/* Telas de lista */
+.bloco{padding:16px 14px 0}
+.bloco h2{font-size:17px;margin:0 0 10px;font-weight:700}
+.bloco h3{font-size:15px;margin:16px 0 6px;color:var(--tinta-2);font-weight:500}
+.cartao{background:var(--folha);border:1px solid var(--linha);border-radius:var(--raio-m);padding:14px}
+.lista{list-style:none;margin:0;padding:0}
+.lista li{padding:11px 0;border-bottom:1px solid var(--linha);display:grid;grid-template-columns:1fr auto;gap:2px 10px}
+.lista li:last-child{border-bottom:0}
+.lista .t{font-weight:500}
+.lista .s{font-size:13px;color:var(--tinta-2);grid-column:1}
+.lista .v{font-weight:700;text-align:right}
+.lista .v.neg{color:var(--vermelho)}
+.lista .v.pos{color:var(--verde)}
+.lista.cartao{padding:0 14px}
+.lista .err{grid-column:1/-1;color:var(--vermelho);font-size:13px}
+.lista .acts{grid-column:1/-1;display:flex;gap:14px;margin-top:4px}
+.lista .acts button{background:none;border:0;padding:4px 0;color:var(--foco);font-size:14px;cursor:pointer}
+.lista .riscado .t,.lista .riscado .v{text-decoration:line-through;opacity:.6}
+.vazio{color:var(--tinta-2);padding:8px 0}
+
+.totais{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.totais div{background:var(--folha);border:1px solid var(--linha);border-radius:var(--raio-m);padding:12px}
+.totais span{font-size:13px;color:var(--tinta-2);display:block}
+.totais b{font-size:21px}
+.barras{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+.barras li{display:grid;grid-template-columns:1fr auto;gap:3px 8px;font-size:14px}
+.barras .b{grid-column:1/-1;height:8px;border-radius:4px;background:var(--linha);overflow:hidden}
+.barras .b i{display:block;height:100%;background:var(--tinta)}
+.nota-res{font-size:13px;color:var(--tinta-2);margin:12px 0 0}
+
+.btn{min-height:48px;border-radius:var(--raio-s);border:1.5px solid var(--tinta);background:var(--folha);padding:0 16px;font-weight:700;cursor:pointer}
+.btn.cheio{background:var(--tinta);color:var(--papel)}
+.btn.perigo{border-color:var(--vermelho);color:var(--vermelho)}
+.btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.copiar{display:flex;gap:8px}
+.copiar code{flex:1;background:var(--papel);border:1px solid var(--linha);border-radius:var(--raio-s);padding:10px;font-size:13px;word-break:break-all}
+.chk{display:flex;gap:12px;align-items:flex-start;padding:10px 0}
+.chk input{width:22px;height:22px;margin-top:1px;accent-color:var(--tinta)}
+.chk small{display:block;color:var(--tinta-2);font-size:13px}
+
+/* Tela inicial (sem conexão configurada) */
+.boasvindas{padding:22px 18px}
+.boasvindas h1{font-size:28px;line-height:1.15;margin:4px 0 10px;font-weight:800}
+.boasvindas p{color:var(--tinta-2);margin:0 0 16px;max-width:36em}
+
+.toast{position:fixed;left:14px;right:14px;bottom:calc(140px + var(--safe-b));z-index:9;background:var(--tinta);color:var(--papel);border-radius:var(--raio-m);padding:13px 15px;font-size:15px;box-shadow:0 6px 24px rgba(0,0,0,.25);transform:translateY(20px);opacity:0;pointer-events:none;transition:.2s}
+.toast.on{transform:none;opacity:1}
+.toast.erro{background:var(--vermelho);color:#fff}
+dialog{border:0;border-radius:var(--raio-m);background:var(--folha);color:var(--tinta);width:min(92vw,420px);padding:18px}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog h2{margin:0 0 10px;font-size:18px}
+</style>
+</head>
+<body data-tela="lancar">
+<header class="top">
+  <div class="mes" role="group" aria-label="Mês da planilha">
+    <button id="mesAnt" aria-label="Mês anterior">‹</button>
+    <div><strong id="mesTxt">—</strong><small id="mesSub">mês da planilha</small></div>
+    <button id="mesProx" aria-label="Próximo mês">›</button>
+  </div>
+  <button class="status" id="status" data-s="off"><i></i><span id="statusTxt">Desconectado</span></button>
+</header>
+
+<main>
+  <!-- LANÇAR -->
+  <section class="tela ativa" id="t-lancar">
+    <div id="semPlanilha" class="boasvindas" hidden>
+      <h1>Lance gastos e receitas direto na FINANCAS_2026</h1>
+      <p>Conecte sua conta Microsoft para gravar na planilha do OneDrive, ou abra uma cópia do arquivo para testar o app sem conectar nada.</p>
+      <div class="btns">
+        <button class="btn cheio" data-ir="ajustes">Configurar conexão</button>
+        <button class="btn" id="abrirLocal1">Testar com um arquivo</button>
+      </div>
+    </div>
+    <div id="comPlanilha">
+      <div class="abas" role="toolbar" aria-label="Aba da planilha" id="abas">
+        <button data-k="despesa" aria-pressed="true">Despesa</button>
+        <button data-k="cartao" aria-pressed="false">Cartão</button>
+        <button data-k="receita" aria-pressed="false">Receita</button>
+        <button data-k="emprestimo" aria-pressed="false">Empréstimo</button>
+        <button data-k="viagem" aria-pressed="false">Viagem</button>
+      </div>
+      <div class="valor">
+        <label for="valor">R$</label>
+        <div class="campo" id="valorCampo"><input id="valor" inputmode="decimal" autocomplete="off" placeholder="0,00" aria-label="Valor em reais"></div>
+        <button class="sinal" id="sinal" aria-pressed="false" title="Lançar como estorno (valor negativo)">− estorno</button>
+      </div>
+      <p class="parcelinfo" id="parcelinfo"></p>
+      <div class="form" id="form"></div>
+      <div class="previa" id="previa" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- RESUMO -->
+  <section class="tela" id="t-resumo"><div class="bloco" id="resumo"></div></section>
+
+  <!-- HISTÓRICO -->
+  <section class="tela" id="t-historico"><div class="bloco" id="historico"></div></section>
+
+  <!-- AJUSTES -->
+  <section class="tela" id="t-ajustes"><div class="bloco" id="ajustes"></div></section>
+</main>
+
+<div class="acao"><button id="gravar" disabled>Gravar na planilha</button></div>
+
+<nav class="baixo" aria-label="Navegação">
+  <button data-tela="lancar" aria-current="page"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Lançar</button>
+  <button data-tela="resumo"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Resumo</button>
+  <button data-tela="historico"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Histórico<span class="badge" id="badge" hidden>0</span></button>
+  <button data-tela="ajustes"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>Ajustes</button>
+</nav>
+
+<div class="toast" id="toast" role="status"></div>
+<input type="file" id="arquivoLocal" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+<dialog id="dlg"><form method="dialog" id="dlgForm"></form></dialog>
+
+<script src="xcore.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
