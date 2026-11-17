@@ -628,7 +628,17 @@
     const y = 2026 + Math.floor(i / 12); const m = i % 12;
     return { i, y, m, label: `${MES[m]}/${y}`, short: `${MES[m].toLowerCase()}/${String(y).slice(2)}` };
   });
-  const S = { rec: 'Receitas', des: 'Despesas', car: 'Cartões', emp: 'Empréstimo', via: 'Viagem' };
+  const S = { rec: 'Receitas', des: 'Despesas', car: 'Cartões', emp: 'Empréstimo', via: 'Viagem', inv: 'Investimento', plan: 'Plan1' };
+  /* Grupos editáveis da aba Investimento: título na coluna "col" (Entrada) e col+1 (Saída). */
+  const INV_GROUPS = [
+    { label: 'Poupança Poupex', col: 'G', titles: ['poupanca', 'poupanca poupex', 'poupex'] },
+    { label: 'Poupança Ouro', col: 'G', titles: ['poupanca ouro'] },
+    { label: 'BB RF LP High', col: 'G', titles: ['bb rf lp high'] },
+    { label: 'Tesouro Selic 2031', col: 'G', titles: ['tesouro selic 2031'] },
+    { label: 'Conta XP', col: 'N', titles: ['xp e clear (saldo financeiro)', 'conta xp', 'xp e clear'] },
+    { label: 'Criptomoedas', col: 'N', titles: ['criptomoedas'] },
+    { label: 'Ações no Banco do Brasil', col: 'N', titles: ['acoes no banco do brasil'] },
+  ];
   const monthCol = (i) => (i < 12 ? colName(2 + i) : colName(15 + i - 12)); // Despesas/Plan1: B..M, O..Q
   const recRow = (i) => (i < 12 ? 5 + i : 18 + i - 12);
   const carHeader = (i) => 2 + 8 * i;
@@ -688,7 +698,25 @@
       items: (() => { const b = viaBlock(0); const out = []; for (let r = b.first; r <= b.last; r++) out.push(via.text(colName(b.itemCol) + r).trim()); return out.filter(Boolean); })(),
       destino: via.text('S3').trim(),
     };
+    // Investimento
+    model.investimento = { groups: [] };
+    if (wb.sheetFiles[S.inv]) {
+      const inv = await wb.sheet(S.inv);
+      for (const g of INV_GROUPS) { const f = invFind(inv, g); if (f) model.investimento.groups.push({ label: g.label, ...f }); }
+    }
     return model;
+  }
+
+  /** Localiza o bloco de um grupo de investimento pelo título; devolve colunas e linha de janeiro. */
+  function invFind(sh, g) {
+    const c = colNum(g.col);
+    for (let r = 1; r <= 400; r++) {
+      if (!g.titles.includes(norm(sh.text(g.col + r)))) continue;
+      const hr = r + 1;
+      if (norm(sh.text(g.col + hr)) !== 'entrada' || norm(sh.text(colName(c + 1) + hr)) !== 'saida') continue;
+      return { inCol: g.col, outCol: colName(c + 1), dateCol: colName(c - 1), title: r, jan: r + 3 };
+    }
+    return null;
   }
 
   function noteLine(e) {
@@ -784,6 +812,18 @@
       for (let r = b.first; r <= b.last; r++) if (norm(sh.text(colName(b.itemCol) + r)) === norm(e.item)) { row = r; break; }
       if (!row) throw new Error(`Item de viagem "${e.item}" não encontrado em ${mo.label}.`);
       await add(sh, colName(b.itemCol + 1) + row, val, `Viagem › ${e.item} › ${mo.label}`, e.desc ? noteLine(e) : '');
+    } else if (e.kind === 'investimento') {
+      if (e.month > 11) throw new Error('A aba Investimento vai só até Dez/2026.');
+      const sh = await wb.sheet(S.inv);
+      const g = INV_GROUPS.find((x) => norm(x.label) === norm(e.group));
+      if (!g) throw new Error(`Grupo de investimento "${e.group}" não é editável pelo app.`);
+      const f = invFind(sh, g);
+      if (!f) throw structErr(S.inv, `grupo ${g.label} não encontrado`);
+      const row = f.jan + e.month;
+      const pc = colName(2 + e.month) + '2';
+      if (!new RegExp(`Plan1!\\$?${pc.replace(/\d+$/, '')}\\$?2\\b`).test(sh.formulaText(f.dateCol + row) || '')) throw structErr(S.inv, `linha de ${mo.label} em ${g.label}`);
+      const col = e.op === 'resgate' ? f.outCol : f.inCol;
+      await add(sh, col + row, val, `Investimento › ${g.label} › ${e.op === 'resgate' ? 'resgate' : 'aplicação'} › ${mo.label}`, e.desc ? noteLine(e) : '');
     } else {
       throw new Error('Tipo de lançamento desconhecido: ' + e.kind);
     }
@@ -842,7 +882,268 @@
     let empRec = 0, empPag = 0;
     if (i < 12) for (let k = 0; k < 6; k++) { empRec += emp.num(colName(3 + 6 * k) + (4 + i)); empPag += emp.num(colName(3 + 6 * k) + (20 + i)); }
     const sum = (a) => a.reduce((x, y) => x + y.total, 0);
-    return { receitas, receitasTotal: sum(receitas), cats, despesasTotal: sum(cats), cards, cartoesTotal: sum(cards), viagem: vt, empRecebido: empRec, empPago: empPag };
+    let aportes = 0, resgates = 0;
+    if (i < 12 && model.investimento && model.investimento.groups.length) {
+      const inv = await wb.sheet(S.inv);
+      for (const g of model.investimento.groups) { aportes += inv.num(g.inCol + (g.jan + i)); resgates += inv.num(g.outCol + (g.jan + i)); }
+    }
+    return { receitas, receitasTotal: sum(receitas), cats, despesasTotal: sum(cats), cards, cartoesTotal: sum(cards), viagem: vt, empRecebido: empRec, empPago: empPag, aportes, resgates };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Calculadora de fórmulas (para o Saldo da Plan1)                     */
+  /* ------------------------------------------------------------------ */
+  const SERIAL0 = Date.UTC(1899, 11, 30);
+  const toSerial = (y, m, d) => Math.round((Date.UTC(y, m - 1, d) - SERIAL0) / 86400000);
+  class XErr { constructor(e) { this.e = e; } }
+  const isErr = (v) => v instanceof XErr;
+  class Unsupported extends Error {}
+  const REF_SRC = "(?:(?:'((?:[^']|'')+)'|([A-Za-z_\\u00C0-\\u024F][\\w.\\u00C0-\\u024F]*))!)?(\\$?)([A-Z]{1,3})(\\$?)(\\d+)(?::(\\$?)([A-Z]{1,3})(\\$?)(\\d+))?";
+
+  function tokenize(f) {
+    const out = []; let i = 0;
+    const refRe = new RegExp('^' + REF_SRC + '(?![\\w(])');
+    while (i < f.length) {
+      const ch = f[i]; const rest = f.slice(i);
+      if (/\s/.test(ch)) { i++; continue; }
+      if (ch === '"') { let j = i + 1, v = ''; while (j < f.length) { if (f[j] === '"') { if (f[j + 1] === '"') { v += '"'; j += 2; continue; } break; } v += f[j++]; } out.push({ t: 'str', v }); i = j + 1; continue; }
+      let m = /^(\d+\.?\d*(?:[eE][+-]?\d+)?|\.\d+(?:[eE][+-]?\d+)?)/.exec(rest);
+      if (m) { out.push({ t: 'num', v: parseFloat(m[1]) }); i += m[1].length; continue; }
+      m = /^(_xlfn\.)?([A-Za-z][A-Za-z0-9.]*)\(/.exec(rest);
+      if (m) { out.push({ t: 'fn', v: m[2].toUpperCase() }); i += m[0].length; continue; }
+      m = refRe.exec(rest);
+      if (m) {
+        const sheet = m[1] != null ? m[1].replace(/''/g, "'") : m[2] || null;
+        out.push(m[8] ? { t: 'range', sheet, c1: colNum(m[4]), r1: +m[6], c2: colNum(m[8]), r2: +m[10] } : { t: 'ref', sheet, c: colNum(m[4]), r: +m[6] });
+        i += m[0].length; continue;
+      }
+      m = /^(TRUE|FALSE)(?![\w(])/i.exec(rest);
+      if (m) { out.push({ t: 'bool', v: m[1].toUpperCase() === 'TRUE' }); i += m[1].length; continue; }
+      m = /^(<=|>=|<>|[-+*/^&=<>%(),;])/.exec(rest);
+      if (m) { out.push({ t: 'op', v: m[1] === ';' ? ',' : m[1] }); i += m[1].length; continue; }
+      if (rest.startsWith('#')) { m = /^#[A-Z0-9/!?]+/.exec(rest); out.push({ t: 'err', v: m ? m[0] : '#ERR' }); i += m ? m[0].length : 1; continue; }
+      throw new Unsupported('Token: ' + rest.slice(0, 12));
+    }
+    return out;
+  }
+  /** Desloca referências relativas (fórmulas compartilhadas do Excel). */
+  function shiftFormula(f, dr, dc) {
+    const re = new RegExp(REF_SRC + '(?![\\w(])', 'g');
+    let out = '', last = 0, inStr = false;
+    // percorre fora de strings
+    const parts = f.split('"');
+    return parts.map((seg, k) => (k % 2 ? seg : seg.replace(re, (all, q, sn, d1, c1, d2, r1, d3, c2, d4, r2, off, whole) => {
+      const prev = whole[off - 1];
+      if (prev && /[A-Za-z0-9_.]/.test(prev) && !q && !sn) return all;
+      const sp = all.slice(0, all.length - (all.length - all.indexOf(d1 + c1 + d2 + r1, all.lastIndexOf('!') + 1)));
+      const one = (d, c, e, r) => (d ? '$' + c : colName(colNum(c) + dc)) + (e ? '$' + r : String(+r + dr));
+      return sp + one(d1, c1, d2, r1) + (c2 ? ':' + one(d3, c2, d4, r2) : '');
+    }))).join('"');
+  }
+  function parseFormula(f) {
+    const tk = tokenize(f); let p = 0;
+    const peek = () => tk[p]; const isOp = (v) => tk[p] && tk[p].t === 'op' && tk[p].v === v;
+    function primary() {
+      const t = tk[p++];
+      if (!t) throw new Unsupported('Fim inesperado');
+      if (t.t === 'num' || t.t === 'str' || t.t === 'bool') return { k: 'lit', v: t.v };
+      if (t.t === 'err') return { k: 'lit', v: new XErr(t.v) };
+      if (t.t === 'ref' || t.t === 'range') return { k: t.t, ...t };
+      if (t.t === 'fn') {
+        const args = [];
+        if (isOp(')')) { p++; return { k: 'fn', name: t.v, args }; }
+        for (;;) {
+          if (isOp(',')) { args.push({ k: 'lit', v: null }); p++; continue; }
+          args.push(cmp());
+          if (isOp(',')) { p++; if (isOp(')')) { args.push({ k: 'lit', v: null }); } continue; }
+          if (isOp(')')) { p++; break; }
+          throw new Unsupported('Função mal formada');
+        }
+        return { k: 'fn', name: t.v, args };
+      }
+      if (t.t === 'op' && t.v === '(') { const e = cmp(); if (!isOp(')')) throw new Unsupported('Parêntese'); p++; return e; }
+      throw new Unsupported('Token inesperado ' + t.v);
+    }
+    function postfix() { let e = primary(); while (isOp('%')) { p++; e = { k: 'pct', a: e }; } return e; }
+    function unary() { if (isOp('-')) { p++; return { k: 'neg', a: unary() }; } if (isOp('+')) { p++; return unary(); } return postfix(); }
+    function pow() { let e = unary(); while (isOp('^')) { p++; e = { k: 'bin', op: '^', a: e, b: unary() }; } return e; }
+    function mul() { let e = pow(); while (isOp('*') || isOp('/')) { const op = tk[p++].v; e = { k: 'bin', op, a: e, b: pow() }; } return e; }
+    function add() { let e = mul(); while (isOp('+') || isOp('-')) { const op = tk[p++].v; e = { k: 'bin', op, a: e, b: mul() }; } return e; }
+    function cat() { let e = add(); while (isOp('&')) { p++; e = { k: 'bin', op: '&', a: e, b: add() }; } return e; }
+    function cmp() { let e = cat(); while (peek() && peek().t === 'op' && ['=', '<>', '<', '>', '<=', '>='].includes(peek().v)) { const op = tk[p++].v; e = { k: 'bin', op, a: e, b: cat() }; } return e; }
+    const e = cmp();
+    if (p !== tk.length) throw new Unsupported('Sobra na fórmula');
+    return e;
+  }
+
+  class Calc {
+    constructor(wb, today) {
+      this.wb = wb; this.vals = new Map(); this.busy = new Set(); this.ast = new Map(); this.masters = new Map();
+      const d = today || new Date();
+      this.today = toSerial(d.getFullYear(), d.getMonth() + 1, d.getDate());
+    }
+    static async create(wb, today) {
+      for (const n of wb.sheetNames()) await wb.sheet(n);
+      return new Calc(wb, today);
+    }
+    sheet(n) { const s = this.wb.sheets[n]; if (!s) throw new Unsupported('Aba ' + n); return s; }
+    master(sh, si) {
+      const key = sh.name + '|' + si;
+      if (!this.masters.has(key)) {
+        let m = null;
+        for (const c of sh.cells().values()) if (c.ft && c.ft.t === 'shared' && c.ft.si === si && c.ft.ref && c.f) { m = c; break; }
+        this.masters.set(key, m);
+      }
+      return this.masters.get(key);
+    }
+    formulaOf(sh, c) {
+      if (c.ft && c.ft.t === 'shared' && !c.f) {
+        const m = this.master(sh, c.ft.si); if (!m) throw new Unsupported('Fórmula compartilhada sem origem em ' + sh.name + '!' + c.ref);
+        const a = parseRef(m.ref), b = parseRef(c.ref);
+        return shiftFormula(m.f, b.r - a.r, b.c - a.c);
+      }
+      if (c.ft && c.ft.t === 'array') throw new Unsupported('Fórmula matricial');
+      return c.f;
+    }
+    value(sheetName, c, r) {
+      const ref = colName(c) + r; const key = sheetName + '!' + ref;
+      if (this.vals.has(key)) return this.vals.get(key);
+      if (this.busy.has(key)) throw new Unsupported('Referência circular em ' + key);
+      const sh = this.sheet(sheetName); const cell = sh.cell(ref);
+      let v = null;
+      if (cell) {
+        if (cell.f != null) {
+          this.busy.add(key);
+          try {
+            const f = this.formulaOf(sh, cell);
+            let ast = this.ast.get(f); if (!ast) { ast = parseFormula(f); this.ast.set(f, ast); }
+            v = this.ev(ast, sheetName);
+            if (Array.isArray(v)) v = v[0] ?? null;
+            if (v == null) v = 0;
+          } finally { this.busy.delete(key); }
+        } else if (cell.t === 's') v = this.wb.ss[+cell.v] ?? '';
+        else if (cell.t === 'inlineStr') v = cell.is ?? '';
+        else if (cell.t === 'b') v = cell.v === '1';
+        else if (cell.t === 'e') v = new XErr(cell.v);
+        else if (cell.t === 'str') v = cell.v ?? '';
+        else if (cell.v != null && cell.v !== '') v = parseFloat(cell.v);
+      }
+      this.vals.set(key, v);
+      return v;
+    }
+    num(v) {
+      if (isErr(v)) return v; if (v == null) return 0; if (typeof v === 'boolean') return v ? 1 : 0;
+      if (typeof v === 'number') return v;
+      const n = Number(String(v).trim()); return v !== '' && isFinite(n) ? n : new XErr('#VALUE!');
+    }
+    bool(v) {
+      if (isErr(v)) return v; if (v == null) return false; if (typeof v === 'boolean') return v; if (typeof v === 'number') return v !== 0;
+      const s = String(v).toUpperCase(); if (s === 'TRUE') return true; if (s === 'FALSE') return false; return new XErr('#VALUE!');
+    }
+    flat(node, sheet) {
+      if (node.k === 'range') {
+        const sn = node.sheet || sheet; const out = [];
+        for (let r = Math.min(node.r1, node.r2); r <= Math.max(node.r1, node.r2); r++) for (let c = Math.min(node.c1, node.c2); c <= Math.max(node.c1, node.c2); c++) out.push({ v: this.value(sn, c, r), fromRange: true });
+        return out;
+      }
+      const v = this.ev(node, sheet);
+      return [{ v, fromRange: node.k === 'ref' }];
+    }
+    ev(n, sheet) {
+      switch (n.k) {
+        case 'lit': return n.v;
+        case 'ref': return this.value(n.sheet || sheet, n.c, n.r);
+        case 'range': return new XErr('#VALUE!');
+        case 'neg': { const a = this.num(this.ev(n.a, sheet)); return isErr(a) ? a : -a; }
+        case 'pct': { const a = this.num(this.ev(n.a, sheet)); return isErr(a) ? a : a / 100; }
+        case 'bin': {
+          const A = this.ev(n.a, sheet), B = this.ev(n.b, sheet);
+          if (isErr(A)) return A; if (isErr(B)) return B;
+          if (n.op === '&') return (A == null ? '' : String(typeof A === 'boolean' ? String(A).toUpperCase() : A)) + (B == null ? '' : String(typeof B === 'boolean' ? String(B).toUpperCase() : B));
+          if (['=', '<>', '<', '>', '<=', '>='].includes(n.op)) {
+            const norm1 = (x, o) => (x == null ? (typeof o === 'string' ? '' : typeof o === 'boolean' ? false : 0) : x);
+            let a = norm1(A, B), b = norm1(B, A);
+            const rank = (x) => (typeof x === 'number' ? 0 : typeof x === 'string' ? 1 : 2);
+            let c;
+            if (rank(a) !== rank(b)) c = rank(a) - rank(b);
+            else if (typeof a === 'string') { a = a.toLowerCase(); b = b.toLowerCase(); c = a < b ? -1 : a > b ? 1 : 0; }
+            else { a = +a; b = +b; c = Math.abs(a - b) < 1e-12 ? 0 : a < b ? -1 : 1; }
+            return { '=': c === 0, '<>': c !== 0, '<': c < 0, '>': c > 0, '<=': c <= 0, '>=': c >= 0 }[n.op];
+          }
+          const a = this.num(A), b = this.num(B); if (isErr(a)) return a; if (isErr(b)) return b;
+          if (n.op === '+') return a + b; if (n.op === '-') return a - b; if (n.op === '*') return a * b;
+          if (n.op === '/') return b === 0 ? new XErr('#DIV/0!') : a / b;
+          if (n.op === '^') return Math.pow(a, b);
+          throw new Unsupported(n.op);
+        }
+        case 'fn': return this.fn(n.name, n.args, sheet);
+      }
+      throw new Unsupported(n.k);
+    }
+    nums(args, sheet) {
+      const out = [];
+      for (const a of args) for (const x of this.flat(a, sheet)) {
+        if (isErr(x.v)) return x.v;
+        if (x.fromRange) { if (typeof x.v === 'number') out.push(x.v); }
+        else { const v = this.num(x.v); if (isErr(v)) return v; out.push(v); }
+      }
+      return out;
+    }
+    fn(name, args, sheet) {
+      const E = (i) => (args[i] ? this.ev(args[i], sheet) : null);
+      switch (name) {
+        case 'IF': { const c = this.bool(E(0)); if (isErr(c)) return c; return c ? (args.length > 1 ? E(1) : true) : (args.length > 2 ? E(2) : false); }
+        case 'IFERROR': { const v = E(0); return isErr(v) ? E(1) : v; }
+        case 'ISERR': case 'ISERROR': { const v = E(0); return isErr(v) && (name === 'ISERROR' || v.e !== '#N/A'); }
+        case 'AND': case 'OR': {
+          let res = name === 'AND';
+          for (const a of args) for (const x of this.flat(a, sheet)) {
+            if (isErr(x.v)) return x.v;
+            if (x.fromRange && typeof x.v !== 'number' && typeof x.v !== 'boolean') continue;
+            const b = this.bool(x.v); if (isErr(b)) return b;
+            res = name === 'AND' ? res && b : res || b;
+          }
+          return res;
+        }
+        case 'NOT': { const b = this.bool(E(0)); return isErr(b) ? b : !b; }
+        case 'SUM': { const v = this.nums(args, sheet); return isErr(v) ? v : v.reduce((a, b) => a + b, 0); }
+        case 'MIN': case 'MAX': { const v = this.nums(args, sheet); if (isErr(v)) return v; return v.length ? Math[name.toLowerCase()](...v) : 0; }
+        case 'ABS': { const v = this.num(E(0)); return isErr(v) ? v : Math.abs(v); }
+        case 'ROUND': case 'ROUNDUP': case 'ROUNDDOWN': case 'TRUNC': {
+          const v = this.num(E(0)); const d = args.length > 1 ? this.num(E(1)) : 0; if (isErr(v)) return v; if (isErr(d)) return d;
+          const f = Math.pow(10, d); const x = Number((Math.abs(v) * f).toPrecision(15));
+          const r = name === 'ROUND' ? Math.round(x) : name === 'ROUNDUP' ? Math.ceil(x) : Math.floor(x);
+          return Math.sign(v) * r / f;
+        }
+        case 'DATE': { const y = this.num(E(0)), m = this.num(E(1)), d = this.num(E(2)); for (const x of [y, m, d]) if (isErr(x)) return x; return toSerial(Math.trunc(y), Math.trunc(m), Math.trunc(d)); }
+        case 'TODAY': return this.today;
+        case 'MONTH': case 'YEAR': case 'DAY': {
+          const v = this.num(E(0)); if (isErr(v)) return v;
+          const d = new Date(SERIAL0 + Math.floor(v) * 86400000);
+          return name === 'MONTH' ? d.getUTCMonth() + 1 : name === 'YEAR' ? d.getUTCFullYear() : d.getUTCDate();
+        }
+      }
+      throw new Unsupported('Função ' + name);
+    }
+  }
+
+  /** Saldo da Plan1 (linha "SALDO") de cada mês, recalculado com os dados atuais. */
+  async function plan1Saldos(wb, today) {
+    const sh = await wb.sheet(S.plan);
+    let row = null;
+    for (let r = 1; r <= 80; r++) if (norm(sh.text('A' + r)) === 'saldo') { row = r; break; }
+    if (!row) throw new Error('Linha SALDO não encontrada na Plan1.');
+    let calc = null, calcErr = null;
+    try { calc = await Calc.create(wb, today); } catch (e) { calcErr = e; }
+    return MONTHS.map((mo) => {
+      const ref = monthCol(mo.i) + row;
+      const cached = sh.num(ref);
+      let value = cached, live = false;
+      if (calc) {
+        try { const v = calc.value(S.plan, colNum(monthCol(mo.i)), row); if (typeof v === 'number') { value = v; live = true; } } catch (e) { calcErr = e; }
+      }
+      return { i: mo.i, label: mo.label, ref: S.plan + '!' + ref, value, cached, live };
+    });
   }
 
   /** Valor atual da célula-alvo de um lançamento (para a prévia). */
@@ -851,6 +1152,6 @@
     try { return await applyEntry(wb, e, opts); } finally { wb.restore(snap); }
   }
 
-  const api = { crc32, readZip, writeZip, Pkg, Workbook, Sheet, colName, colNum, parseRef, evalSimple, MONTHS, S, readModel, applyEntry, applyAll, undoEntry, monthSummary, preview, renamePerson, fmtBR, round2, norm };
+  const api = { INV_GROUPS, Calc, plan1Saldos, parseFormula, shiftFormula, tokenize, crc32, readZip, writeZip, Pkg, Workbook, Sheet, colName, colNum, parseRef, evalSimple, MONTHS, S, readModel, applyEntry, applyAll, undoEntry, monthSummary, preview, renamePerson, fmtBR, round2, norm };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.XCore = api;
 })(typeof self !== 'undefined' ? self : this);

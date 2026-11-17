@@ -10,16 +10,24 @@ const hoje = () => { const d = new Date(); return `${d.getFullYear()}-${String(d
 const mesDeData = (iso) => { const [y, m] = iso.split('-').map(Number); const i = (y - 2026) * 12 + (m - 1); return i >= 0 && i < 15 ? i : null; };
 
 const CATS_CARTAO = ['Restaurantes', 'Supermercados', 'Serviços', 'Transporte', 'Saúde', 'Lazer', 'Vestuário', 'Viagens', 'Compras parceladas', 'Outros lançamentos'];
-const KINDS = { despesa: 'Despesa', cartao: 'Cartão', receita: 'Receita', emprestimo: 'Empréstimo', viagem: 'Viagem' };
+const KINDS = { despesa: 'Despesa', cartao: 'Cartão', receita: 'Receita', emprestimo: 'Empréstimo', viagem: 'Viagem', investimento: 'Investimento' };
 const LOG_NAME = 'Lancamentos_App.csv';
 
 /* ---------------- Estado persistente ---------------- */
 const LS = 'fin2026.v1';
 const st = Object.assign({
-  settings: { mode: '', clientId: '', filePath: 'Anexos/Planilha com IA/FINANCAS_2026.xlsx', itemId: '', fileName: '', parentId: '', notes: true, csv: true, account: '' },
+  settings: { mode: '', clientId: '', filePath: 'Documentos/FINANCAS_2026.xlsx', itemId: '', fileName: '', parentId: '', notes: true, csv: true, account: '' },
   queue: [], history: [], prefs: {}, auth: null,
 }, JSON.parse(localStorage.getItem(LS) || '{}'));
 const save = () => localStorage.setItem(LS, JSON.stringify(st));
+/* Versão 2: a planilha passou para OneDrive\Documentos. Quem usava o caminho antigo é migrado
+   e o arquivo é localizado de novo (sem reaproveitar o vínculo antigo). */
+if (!st.settings.v2) {
+  if (!st.settings.filePath || /^Anexos\/Planilha com IA\//i.test(st.settings.filePath)) {
+    st.settings.filePath = 'Documentos/FINANCAS_2026.xlsx'; st.settings.itemId = ''; st.settings.parentId = '';
+  }
+  st.settings.v2 = true; localStorage.setItem(LS, JSON.stringify(st));
+}
 
 /* IndexedDB: cópia local da planilha */
 const idb = {
@@ -109,11 +117,27 @@ async function localizarArquivo() {
   if (st.settings.itemId) {
     try { return await graphJson(`/me/drive/items/${st.settings.itemId}`); } catch (e) { if (e.status !== 404) throw e; }
   }
-  try {
-    const it = await graphJson(`/me/drive/root:/${encPath(st.settings.filePath)}`);
-    escolherArquivo(it); return it;
-  } catch (e) { if (e.status !== 404) throw e; }
-  const e = new Error(`Não encontrei "${st.settings.filePath}" no OneDrive. Use "Procurar no OneDrive" em Ajustes.`); e.notFound = true; throw e;
+  const caminho = st.settings.filePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  const tentativas = [`/me/drive/root:/${encPath(caminho)}`];
+  // A pasta "Documentos" do OneDrive pessoal pode se chamar internamente "Documents".
+  const m = /^(Documentos|Documents)\/(.+)$/i.exec(caminho);
+  if (m) {
+    tentativas.push(`/me/drive/root:/${encPath((m[1].toLowerCase() === 'documentos' ? 'Documents/' : 'Documentos/') + m[2])}`);
+    tentativas.push(`/me/drive/special/documents:/${encPath(m[2])}`);
+  }
+  for (const t of tentativas) {
+    try { const it = await graphJson(t); if (it.file) { escolherArquivo(it); return it; } } catch (e) { if (e.status !== 404 && e.code !== 'itemNotFound') throw e; }
+  }
+  // Último recurso: procurar pelo nome do arquivo e usar se houver um só candidato claro.
+  const nome = caminho.split('/').pop();
+  const achados = (await buscarArquivos(nome.replace(/\.xlsx$/i, ''))).filter((x) => x.name.toLowerCase() === nome.toLowerCase());
+  const naPasta = achados.filter((x) => /\/(Documentos|Documents)$/i.test(decodeURIComponent(x.parentReference?.path || '')));
+  const escolhido = naPasta.length === 1 ? naPasta[0] : achados.length === 1 ? achados[0] : null;
+  if (escolhido) { const it = await graphJson(`/me/drive/items/${escolhido.id}`); escolherArquivo(it); return it; }
+  const e = new Error(achados.length > 1
+    ? `Há ${achados.length} arquivos "${nome}" no OneDrive. Use "Procurar no OneDrive" em Ajustes e escolha o da pasta Documentos.`
+    : `Não encontrei "${caminho}" no OneDrive. Confira o caminho em Ajustes ou use "Procurar no OneDrive".`);
+  e.notFound = true; throw e;
 }
 function escolherArquivo(it) {
   st.settings.itemId = it.id; st.settings.fileName = it.name; st.settings.parentId = it.parentReference?.id || '';
@@ -318,6 +342,18 @@ function formHTML() {
       + `<div class="linha2">${data}${field('m', 'Mês na planilha', `<input value="${h(X.MONTHS[ui.month].label)}" readonly tabindex="-1">`)}</div>`
       + desc('ex.: Hotel em Maceió');
   }
+  if (k === 'investimento') {
+    const gs = model.investimento?.groups || [];
+    if (!gs.length) return '<p class="dica" style="color:var(--vermelho)">Não encontrei os grupos editáveis na aba Investimento.</p>';
+    if (!f.group || !gs.some((g) => g.label === f.group)) f.group = p.invGroup && gs.some((g) => g.label === p.invGroup) ? p.invGroup : gs[0].label;
+    if (!f.op) f.op = 'aporte';
+    return field('group', 'Investimento', `<select data-f="group">${opts(gs.map((g) => g.label), f.group)}</select>`)
+      + `<div class="f"><span>Operação</span>${seg('op', [['aporte', 'Aplicação'], ['resgate', 'Resgate']], f.op)}</div>`
+      + `<p class="dica">${f.op === 'resgate' ? 'Vai para a coluna Saída do grupo.' : 'Vai para a coluna Entrada do grupo.'}</p>`
+      + `<div class="linha2">${data}${field('m', 'Mês na planilha', `<input value="${h(X.MONTHS[ui.month].label)}" readonly tabindex="-1">`)}</div>`
+      + (ui.month > 11 ? '<p class="dica" style="color:var(--vermelho)">A aba Investimento vai só até Dez/2026.</p>' : '')
+      + desc('ex.: Compra Tesouro Selic');
+  }
   return '';
 }
 const cap = (s) => { s = String(s).trim(); return s === s.toUpperCase() ? s.charAt(0) + s.slice(1).toLowerCase() : s; };
@@ -334,6 +370,7 @@ function entradaAtual() {
   if (ui.kind === 'receita') e.col = f.col;
   if (ui.kind === 'emprestimo') Object.assign(e, { section: f.section, person: +f.person, op: f.op });
   if (ui.kind === 'viagem') e.item = f.item;
+  if (ui.kind === 'investimento') Object.assign(e, { group: f.group, op: f.op || 'aporte' });
   return e;
 }
 
@@ -346,7 +383,7 @@ function atualizarPrevia() {
     const pi = $('#parcelinfo');
     pi.textContent = ui.kind === 'cartao' && (ui.f.parcelas || 1) > 1 && v > 0 ? `${ui.f.parcelas}x de ${brl(Math.floor(v / ui.f.parcelas * 100) / 100)}` : '';
     const e = entradaAtual();
-    let ok = isFinite(v) && v > 0 && !(ui.kind === 'cartao' && !e.card) && !(ui.kind === 'emprestimo' && ui.month > 11);
+    let ok = isFinite(v) && v > 0 && !(ui.kind === 'cartao' && !e.card) && !((ui.kind === 'emprestimo' || ui.kind === 'investimento') && ui.month > 11) && !(ui.kind === 'investimento' && !e.group);
     $('#gravar').disabled = !ok;
     if (!ok || !wbView) { el.innerHTML = ''; return; }
     try {
@@ -377,6 +414,7 @@ async function gravar() {
   if (e.kind === 'receita') p.recCol = e.col;
   if (e.kind === 'emprestimo') { p.empSec = e.section; p.empPerson = e.person; }
   if (e.kind === 'viagem') p.viaItem = e.item;
+  if (e.kind === 'investimento') p.invGroup = e.group;
   save();
   $('#valor').value = ''; ui.neg = false; $('#sinal').setAttribute('aria-pressed', 'false');
   ui.f = { ...ui.f, desc: '', parcelas: 1, cardNovo: '' };
@@ -396,7 +434,7 @@ function renderResumo() {
     el.innerHTML = `<h2>${h(X.MONTHS[ui.month].label)}</h2>
       <div class="totais">
         <div><span>Receitas</span><b style="color:var(--verde)">${brl(s.receitasTotal + s.empRecebido)}</b></div>
-        <div><span>Saídas lançadas</span><b style="color:var(--vermelho)">${brl(saidas)}</b></div>
+        <div><span>Despesas</span><b style="color:var(--vermelho)">${brl(saidas)}</b></div>
       </div>
       <h3>Despesas por categoria · ${brl(s.despesasTotal)}</h3>
       <ul class="barras">${s.cats.filter((c) => c.total).map((c) => `<li><span>${h(cap(c.name))}</span><b>${brl(c.total)}</b><span class="b"><i style="width:${(c.total / max * 100).toFixed(1)}%"></i></span></li>`).join('') || '<li class="vazio">Nenhuma despesa neste mês.</li>'}</ul>
@@ -409,8 +447,27 @@ function renderResumo() {
         <li><span class="t">Empréstimos pagos</span><span class="v">${brl(s.empPago)}</span></li>
         <li><span class="t">Empréstimos recebidos</span><span class="v pos">${brl(s.empRecebido)}</span></li>
       </ul>
-      <p class="nota-res">Calculado a partir das abas Receitas, Despesas, Cartões, Empréstimo e Viagem na última versão sincronizada${cache?.at ? ' (' + new Date(cache.at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) + ')' : ''}. Saldo, aplicações e transferências continuam na aba Plan1.</p>`;
+      <div id="saldoBloco"><h3>Saldo do Mês</h3><p class="vazio">Calculando…</p></div>
+      <p class="nota-res">Valores da última versão sincronizada${cache?.at ? ' (' + new Date(cache.at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) + ')' : ''}.</p>`;
+    renderSaldo();
   }).catch((e) => { el.innerHTML = `<p class="vazio">${h(e.message)}</p>`; });
+}
+
+/* Saldo da Plan1: recalculado pelo app com as fórmulas da planilha (inclui os lançamentos já gravados). */
+let saldoCache = { key: '', data: null };
+async function renderSaldo() {
+  const el = $('#saldoBloco'); if (!el || !wbView || !cache) return;
+  const key = (cache?.etag || '') + '|' + hoje();
+  if (saldoCache.key !== key) {
+    await new Promise((r) => setTimeout(r, 30));
+    try { const copia = await X.Workbook.open(cache.bytes); saldoCache = { key, data: await X.plan1Saldos(copia) }; } catch (e) { el.innerHTML = `<h3>Saldo do Mês</h3><p class="vazio">${h(e.message)}</p>`; return; }
+  }
+  if (!$('#saldoBloco')) return;
+  const lista = saldoCache.data; const atual = lista[ui.month];
+  const cor = (v) => (v < 0 ? 'var(--vermelho)' : 'var(--verde)');
+  el.innerHTML = `<h3>Saldo do Mês</h3>
+    <div class="saldo"><span>${h(atual.label)}</span><b style="color:${cor(atual.value)}">${brl(atual.value)}</b></div>
+    <p class="nota-res">${!atual.live ? 'Último valor salvo pelo Excel.' : 'Calculado pelo app com as mesmas fórmulas da Plan1, já com os lançamentos gravados. O Excel mostra o mesmo valor ao abrir a planilha.'}</p>`;
 }
 
 function descEntrada(e) {
@@ -422,6 +479,7 @@ function descEntrada(e) {
   if (e.kind === 'receita') t = `Receita › ${model?.receitas.cols.find((c) => c.col === e.col)?.label || e.col}`;
   if (e.kind === 'emprestimo') t = `${e.section === 'receber' ? 'A receber' : 'A pagar'} › ${model?.emprestimo[e.section][e.person] || 'Pessoa ' + (e.person + 1)} › ${e.op === 'pago' ? (e.section === 'receber' ? 'recebi' : 'paguei') : (e.section === 'receber' ? 'emprestei' : 'peguei')}`;
   if (e.kind === 'viagem') t = `Viagem › ${e.item}`;
+  if (e.kind === 'investimento') t = `${e.group} › ${e.op === 'resgate' ? 'resgate' : 'aplicação'}`;
   return { t, s: [KINDS[e.kind], m, e.desc].filter(Boolean).join(' · ') };
 }
 function renderHistorico() {

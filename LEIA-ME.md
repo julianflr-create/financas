@@ -1,54 +1,99 @@
-# Finanças 2026: app de lançamentos para a planilha FINANCAS_2026.xlsx
+# Finanças 2026: instruções de instalação
 
-Este app roda no navegador do celular e pode ser instalado na tela inicial do Galaxy S24 FE (Chrome → ⋮ → **Adicionar à tela inicial / Instalar app**). Ele grava direto no arquivo do OneDrive, nas abas **Receitas, Despesas, Cartões, Empréstimo e Viagem**. As outras abas (Plan1, Investimento, Fluxo, Metas, Futuros, IRPF) não são alteradas e se recalculam sozinhas quando a planilha é aberta no Excel.
+App para o Galaxy S24 FE que faz lançamentos direto na planilha **FINANCAS_2026.xlsx**, guardada em **OneDrive › Documentos**.
 
-## Como ele grava
+## O que o app faz
 
-- **Despesas, Receitas, Viagem e Empréstimo:** o valor é somado à célula do mês, no mesmo formato que você já usa (`=43.9+25.5`). A descrição vira uma linha no comentário da célula ("16/11 Taishi Sushi").
-- **Cartões:** cada compra vai para a próxima coluna livre da linha do cartão, na fatura escolhida. O comentário segue o seu padrão ("Restaurantes - 14/11 / Madrecita…"). Compras parceladas são distribuídas pelas faturas seguintes como "PARC 01/06", "PARC 02/06" e assim por diante.
-- Só as células do lançamento são alteradas. Formatação, fórmulas, comentários existentes e as demais abas ficam intactos.
-- Sem internet, os lançamentos ficam numa fila e são gravados quando a conexão voltar.
-- Cada lançamento pode ser **desfeito** pelo Histórico, desde que a célula não tenha sido mexida depois.
-- Opcional: o app mantém um registro de tudo em `Lancamentos_App.csv`, na mesma pasta da planilha.
+O app grava nas abas **Receitas, Despesas, Cartões, Empréstimo, Viagem e Investimento**. Plan1, Fluxo, Metas, Futuros e IRPF não são alteradas pelo app e continuam sendo editadas direto no Excel.
 
-## Instalação (uma vez, cerca de 15 minutos)
+| Aba | Como grava |
+|---|---|
+| Despesas, Receitas, Viagem, Empréstimo | Soma o valor na célula do mês (`=43.9+25.5`). A descrição vira comentário na célula. |
+| Cartões | Usa a próxima coluna livre do cartão na fatura escolhida. Parcelas vão para as faturas seguintes ("PARC 01/06"). |
+| Investimento | **Aplicação** vai para a coluna **Entrada** e **Resgate** vai para a coluna **Saída** do grupo, no mês escolhido. Só estes grupos são editáveis: Poupança Poupex, Poupança Ouro, BB RF LP High, Tesouro Selic 2031, Conta XP, Criptomoedas e Ações no Banco do Brasil. |
 
-### 1. Publicar o app (GitHub Pages, gratuito)
+A tela **Resumo** mostra Receitas, **Despesas**, despesas por categoria e faturas de cartão. No final aparece o **Saldo do Mês** (linha SALDO da Plan1) do mês escolhido. O app recalcula o saldo com as mesmas fórmulas da Plan1, então ele já inclui os lançamentos gravados. É o mesmo valor que o Excel mostra ao abrir a planilha.
 
-1. Crie uma conta em github.com, se ainda não tiver.
-2. Crie um repositório **público** chamado `financas`.
-3. Clique em **Add file → Upload files** e envie **o conteúdo** desta pasta: `index.html`, `app.js`, `xcore.js`, `sw.js`, `manifest.webmanifest` e a pasta `icons`. Depois clique em **Commit**.
-4. Abra **Settings → Pages**, escolha **Branch: main / (root)** e clique em **Save**.
-5. Em um ou dois minutos o app estará em `https://SEU-USUARIO.github.io/financas/`.
+Limites da própria planilha: Empréstimo e Investimento vão até **Dez/2026**. Despesas, Receitas, Cartões e Viagem vão até **Mar/2027**.
 
-Só o código do app fica no GitHub, sem nenhum dado financeiro e sem senha. Os dados vão direto do celular para o seu OneDrive.
+---
 
-### 2. Registrar o app na Microsoft (para permitir o acesso ao OneDrive)
+## Se você já instalou a versão anterior
 
-1. Acesse **portal.azure.com** com a mesma conta Microsoft do OneDrive. Desde 2024 a Microsoft exige um "diretório" para registrar apps. Se aparecer um aviso de que a conta não pertence a um diretório, crie a conta gratuita do Azure (pode pedir cartão só para verificação; o registro de app não tem custo).
-2. Abra **Microsoft Entra ID → Registros de aplicativo → Novo registro**.
-   - Nome: `Finanças 2026`
-   - Tipos de conta: **Somente contas pessoais da Microsoft**
-   - URI de redirecionamento: plataforma **Aplicativo de página única (SPA)**, com o endereço do passo 1 exatamente igual, com a barra no final (`https://SEU-USUARIO.github.io/financas/`). O app mostra esse endereço em **Ajustes**, com um botão para copiar.
-3. Clique em **Registrar** e copie o **ID do aplicativo (cliente)**.
-4. Em **Permissões de API**, confira se estão as permissões delegadas do Microsoft Graph `User.Read`, `Files.ReadWrite` e `offline_access`. Se faltar alguma, adicione. Você vai consentir na primeira vez que entrar.
+1. No GitHub, abra o repositório `financas` e clique em **Add file → Upload files**.
+2. Envie os arquivos novos `index.html`, `app.js`, `xcore.js` e `sw.js` (podem ser todos os arquivos do zip, sem problema) e clique em **Commit changes**.
+3. Espere de 1 a 2 minutos. No celular, feche o app e abra de novo.
+4. Na primeira abertura, o app troca sozinho o caminho antigo (Anexos) por **Documentos/FINANCAS_2026.xlsx** e localiza o arquivo. Em **Ajustes**, o caminho pode aparecer como `Documents/FINANCAS_2026.xlsx`: é o nome interno que o OneDrive usa para a pasta Documentos, e está certo.
 
-### 3. Configurar no celular
+Não é preciso mexer no Azure nem entrar de novo na conta.
 
-1. Abra o endereço do app no Chrome do S24 FE.
-2. Vá em **Ajustes**, cole o **Client ID** e toque em **Entrar com a conta Microsoft**.
-3. O caminho padrão é `Anexos/Planilha com IA/FINANCAS_2026.xlsx`. Se o app não encontrar o arquivo (a pasta "Anexos" às vezes tem outro nome interno), toque em **Procurar no OneDrive** e escolha a planilha.
-4. No menu ⋮ do Chrome, toque em **Adicionar à tela inicial** para usar como aplicativo.
+---
 
-A sessão da Microsoft para apps desse tipo dura cerca de 24 horas. Depois disso, o indicador no topo mostra **Entrar**: basta tocar nele, e os lançamentos feitos nesse meio-tempo continuam na fila.
+## Instalação do zero
 
-## Cuidados
+### 1. Publicar o app no GitHub Pages (gratuito)
 
-- Evite lançar pelo celular enquanto estiver editando a planilha no Excel do computador. O app detecta conflitos e tenta de novo, mas se o arquivo estiver bloqueado ele avisa e mantém o lançamento na fila.
-- O OneDrive guarda o histórico de versões do arquivo (clique com o botão direito no arquivo → **Histórico de versões**), o que serve como cópia de segurança.
-- Limites da própria planilha: Empréstimo vai até Dez/2026. Despesas, Receitas, Cartões e Viagem vão até Mar/2027. Parcelas que passarem disso não são lançadas, e o app avisa antes de gravar.
-- Para a planilha de 2027, se ela mantiver a mesma estrutura, basta trocar o caminho do arquivo em **Ajustes**.
+1. Entre em **github.com** (crie uma conta, se precisar).
+2. Clique em **New repository**, use o nome `financas`, marque **Public** e clique em **Create repository**.
+3. Clique em **uploading an existing file** (ou **Add file → Upload files**) e arraste **o conteúdo** da pasta do zip: `index.html`, `app.js`, `xcore.js`, `sw.js`, `manifest.webmanifest`, `LEIA-ME.md` e a pasta `icons`. Não envie a pasta `financas-app` inteira, só o que está dentro dela. Clique em **Commit changes**.
+4. Vá em **Settings → Pages**. Em *Source*, escolha **Deploy from a branch**, depois **Branch: main** e **/(root)**, e clique em **Save**.
+5. Após 1 a 2 minutos, o topo dessa página mostra **"Your site is live at https://SEU-USUARIO.github.io/financas/"**. Esse é o endereço do app. Troque `SEU-USUARIO` pelo seu usuário do GitHub; não use o texto de exemplo.
 
-## Modo de teste
+No GitHub fica só o código do app, sem dados financeiros e sem senha.
 
-Em **Ajustes → Abrir arquivo** você pode carregar uma cópia do .xlsx salva no celular, fazer lançamentos e baixar a cópia alterada para conferir no Excel, sem conectar ao OneDrive.
+### 2. Registrar o app na Microsoft
+
+O registro dá ao app permissão para ler e gravar a planilha no seu OneDrive.
+
+1. Abra uma **janela anônima** no navegador do computador.
+2. Se você ainda não tem conta no Azure, crie a conta gratuita em **azure.microsoft.com/pt-br/free** com **a mesma conta Microsoft do OneDrive**. Sem isso, o portal mostra o erro `401 – Erro ao carregar o conteúdo`, porque a conta pessoal não tem um diretório próprio. O cadastro pode pedir cartão só para verificação; o registro do app não gera cobrança.
+3. Em outra janela anônima, entre em **entra.microsoft.com** ou **portal.azure.com**. Se aparecer mais de um diretório, clique no seu perfil → **Trocar diretório** e escolha o seu ("Diretório padrão").
+4. Abra **Microsoft Entra ID → Registros de aplicativo → Novo registro** e preencha:
+   - **Nome:** `Finanças 2026`
+   - **Tipos de conta com suporte:** *Somente contas pessoais da Microsoft*
+   - **URI de redirecionamento:** escolha a plataforma **Aplicativo de página única (SPA)** e cole o endereço do passo 1.5, **com a barra no final**, por exemplo `https://julianflr.github.io/financas/`.
+5. Clique em **Registrar** e copie o **ID do aplicativo (cliente)**, que tem este formato: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`.
+6. Abra **Permissões de API** e confira se estão as permissões delegadas do Microsoft Graph `User.Read`, `Files.ReadWrite` e `offline_access`. Se faltar alguma: **Adicionar uma permissão → Microsoft Graph → Permissões delegadas**.
+
+### 3. Configurar no celular (S24 FE)
+
+1. Abra o endereço do app no **Chrome**.
+2. Toque em **Ajustes** (canto inferior direito).
+3. Cole o **Client ID** do passo 2.5.
+4. Confira o **endereço de redirecionamento** mostrado em Ajustes. Ele precisa ser idêntico ao cadastrado no Azure; use o botão **Copiar** se precisar corrigir lá.
+5. Confira o caminho do arquivo: **`Documentos/FINANCAS_2026.xlsx`**.
+6. Toque em **Entrar com a conta Microsoft** e aceite as permissões.
+7. Se o app avisar que não encontrou o arquivo, toque em **Procurar no OneDrive** e escolha a planilha da pasta Documentos.
+8. No menu **⋮** do Chrome, toque em **Adicionar à tela inicial → Instalar**. O app passa a abrir como um aplicativo normal.
+
+### 4. Primeiro teste
+
+1. Faça um lançamento pequeno, por exemplo uma despesa de R$ 1,00 com a descrição "teste".
+2. Abra a planilha no Excel e confira a célula e o comentário.
+3. Volte ao app e use **Histórico → Desfazer** para retirar o teste.
+
+---
+
+## Uso no dia a dia
+
+- **Mês da planilha:** use as setas ‹ › no topo. Na aba Cartão, elas escolhem a **fatura**.
+- **Estorno:** o botão "− estorno" lança o valor como negativo.
+- **Sem internet:** o lançamento fica na fila (o indicador no topo mostra a quantidade) e é gravado sozinho quando a conexão voltar.
+- **Sessão expirada:** a sessão da Microsoft dura cerca de 24 horas. Quando o indicador mostrar **Entrar**, toque nele. Os lançamentos da fila não se perdem.
+- **Registro:** o arquivo `Lancamentos_App.csv`, na mesma pasta da planilha, guarda data, valor, descrição e células alteradas de cada lançamento.
+- **Cópia de segurança:** o OneDrive guarda o histórico de versões. No site do OneDrive, clique com o botão direito no arquivo e escolha **Histórico de versões**.
+
+## Problemas comuns
+
+| Mensagem | O que fazer |
+|---|---|
+| `404 – There isn't a GitHub Pages site here` | O endereço está errado ou o Pages não foi ativado. Confira o passo 1.4 e copie o endereço exato de Settings → Pages. |
+| `401 – Erro ao carregar o conteúdo` no Azure | A conta Microsoft ainda não tem diretório. Faça o passo 2.2 e entre de novo em janela anônima. |
+| Erro de redirecionamento no login (`redirect_uri`) | O endereço cadastrado no Azure não é idêntico ao do app. Copie o que aparece em Ajustes, com a barra final, e confira se a plataforma é **SPA**. |
+| "Não encontrei … no OneDrive" | Use **Procurar no OneDrive** em Ajustes. |
+| "A planilha está bloqueada para edição" | A planilha está aberta e sendo editada em outro lugar. Feche-a no Excel e toque no indicador do topo para gravar. |
+| "A célula … foi alterada depois deste lançamento" (ao desfazer) | A célula foi mexida depois do lançamento. Desfaça direto no Excel. |
+
+## Modo de teste (sem OneDrive)
+
+Em **Ajustes → Abrir arquivo**, escolha uma cópia do .xlsx salva no celular e faça lançamentos à vontade. Depois toque em **Baixar cópia da planilha** e confira no Excel. Nada é enviado ao OneDrive nesse modo.

@@ -143,6 +143,12 @@ nav.baixo button[aria-current="page"]::before{content:"";position:absolute;top:0
 .barras .b{grid-column:1/-1;height:8px;border-radius:4px;background:var(--linha);overflow:hidden}
 .barras .b i{display:block;height:100%;background:var(--tinta)}
 .nota-res{font-size:13px;color:var(--tinta-2);margin:12px 0 0}
+.saldo{background:var(--folha);border:1px solid var(--linha);border-left:4px solid var(--marca);border-radius:0 var(--raio-m) var(--raio-m) 0;padding:12px 14px;margin-bottom:10px}
+.saldo span{display:block;font-size:13px;color:var(--tinta-2)}
+.saldo b{font-size:28px;font-weight:800}
+.saldos li{padding:8px 0}
+.saldos li.atual .t{font-weight:700}
+.saldos li.atual{background:linear-gradient(to right,var(--marca-suave),transparent);margin:0 -14px;padding-left:14px;padding-right:14px}
 
 .btn{min-height:48px;border-radius:var(--raio-s);border:1.5px solid var(--tinta);background:var(--folha);padding:0 16px;font-weight:700;cursor:pointer}
 .btn.cheio{background:var(--tinta);color:var(--papel)}
@@ -195,6 +201,7 @@ dialog h2{margin:0 0 10px;font-size:18px}
         <button data-k="receita" aria-pressed="false">Receita</button>
         <button data-k="emprestimo" aria-pressed="false">Empréstimo</button>
         <button data-k="viagem" aria-pressed="false">Viagem</button>
+        <button data-k="investimento" aria-pressed="false">Investimento</button>
       </div>
       <div class="valor">
         <label for="valor">R$</label>
