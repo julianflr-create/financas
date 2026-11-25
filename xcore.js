@@ -635,7 +635,7 @@
     { label: 'Poupança Ouro', col: 'G', titles: ['poupanca ouro'] },
     { label: 'BB RF LP High', col: 'G', titles: ['bb rf lp high'] },
     { label: 'Tesouro Selic 2031', col: 'G', titles: ['tesouro selic 2031'] },
-    { label: 'Conta XP', col: 'N', titles: ['xp e clear (saldo financeiro)', 'conta xp', 'xp e clear'] },
+    { label: 'Conta XP', col: 'N', titles: ['xp e clear (saldo financeiro)', 'conta xp', 'xp e clear'], fuzzy: /\bxp\b/ },
     { label: 'Criptomoedas', col: 'N', titles: ['criptomoedas'] },
     { label: 'Ações no Banco do Brasil', col: 'N', titles: ['acoes no banco do brasil'] },
   ];
@@ -711,7 +711,8 @@
   function invFind(sh, g) {
     const c = colNum(g.col);
     for (let r = 1; r <= 400; r++) {
-      if (!g.titles.includes(norm(sh.text(g.col + r)))) continue;
+      const t = norm(sh.text(g.col + r));
+      if (!g.titles.includes(t) && !(g.fuzzy && g.fuzzy.test(t))) continue;
       const hr = r + 1;
       if (norm(sh.text(g.col + hr)) !== 'entrada' || norm(sh.text(colName(c + 1) + hr)) !== 'saida') continue;
       return { inCol: g.col, outCol: colName(c + 1), dateCol: colName(c - 1), title: r, jan: r + 3 };

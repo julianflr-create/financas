@@ -446,6 +446,8 @@ function renderResumo() {
         <li><span class="t">Viagem</span><span class="v">${brl(s.viagem)}</span></li>
         <li><span class="t">Empréstimos pagos</span><span class="v">${brl(s.empPago)}</span></li>
         <li><span class="t">Empréstimos recebidos</span><span class="v pos">${brl(s.empRecebido)}</span></li>
+        ${ui.month < 12 ? `<li><span class="t">Aplicação</span><span class="v">${brl(s.aportes)}</span></li>
+        <li><span class="t">Resgate</span><span class="v pos">${brl(s.resgates)}</span></li>` : ''}
       </ul>
       <div id="saldoBloco"><h3>Saldo do Mês</h3><p class="vazio">Calculando…</p></div>
       <p class="nota-res">Valores da última versão sincronizada${cache?.at ? ' (' + new Date(cache.at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) + ')' : ''}.</p>`;
@@ -467,7 +469,7 @@ async function renderSaldo() {
   const cor = (v) => (v < 0 ? 'var(--vermelho)' : 'var(--verde)');
   el.innerHTML = `<h3>Saldo do Mês</h3>
     <div class="saldo"><span>${h(atual.label)}</span><b style="color:${cor(atual.value)}">${brl(atual.value)}</b></div>
-    <p class="nota-res">${!atual.live ? 'Último valor salvo pelo Excel.' : 'Calculado pelo app com as mesmas fórmulas da Plan1, já com os lançamentos gravados. O Excel mostra o mesmo valor ao abrir a planilha.'}</p>`;
+    ${!atual.live ? '<p class="nota-res">Último valor salvo pelo Excel.</p>' : ''}`;
 }
 
 function descEntrada(e) {

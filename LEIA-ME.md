@@ -12,7 +12,7 @@ O app grava nas abas **Receitas, Despesas, Cartões, Empréstimo, Viagem e Inves
 | Cartões | Usa a próxima coluna livre do cartão na fatura escolhida. Parcelas vão para as faturas seguintes ("PARC 01/06"). |
 | Investimento | **Aplicação** vai para a coluna **Entrada** e **Resgate** vai para a coluna **Saída** do grupo, no mês escolhido. Só estes grupos são editáveis: Poupança Poupex, Poupança Ouro, BB RF LP High, Tesouro Selic 2031, Conta XP, Criptomoedas e Ações no Banco do Brasil. |
 
-A tela **Resumo** mostra Receitas, **Despesas**, despesas por categoria e faturas de cartão. No final aparece o **Saldo do Mês** (linha SALDO da Plan1) do mês escolhido. O app recalcula o saldo com as mesmas fórmulas da Plan1, então ele já inclui os lançamentos gravados. É o mesmo valor que o Excel mostra ao abrir a planilha.
+A tela **Resumo** mostra Receitas, **Despesas**, despesas por categoria, faturas de cartão e, em **Outros**, os totais de **Aplicação** e **Resgate** do mês (soma das colunas Entrada e Saída dos 7 grupos de investimento, incluindo a Conta XP). No final aparece o **Saldo do Mês** (linha SALDO da Plan1) do mês escolhido. O app recalcula o saldo com as mesmas fórmulas da Plan1, então ele já inclui os lançamentos gravados. É o mesmo valor que o Excel mostra ao abrir a planilha.
 
 Limites da própria planilha: Empréstimo e Investimento vão até **Dez/2026**. Despesas, Receitas, Cartões e Viagem vão até **Mar/2027**.
 

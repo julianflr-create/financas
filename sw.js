@@ -1,6 +1,6 @@
 /* Service worker: o app abre mesmo sem internet; lançamentos ficam na fila.
    Arquivos do app: rede primeiro (pega atualizações na hora), cópia local se estiver offline. */
-const VERSAO = 'fin2026-v4';
+const VERSAO = 'fin2026-v5';
 const SHELL = ['./', 'index.html', 'app.js', 'xcore.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== VERSAO).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
